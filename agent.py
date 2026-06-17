@@ -83,7 +83,7 @@ def _build_agent():
         include_tables=["products", "stores", "sales", "inventory"],
     )
     llm = ChatOpenAI(
-        model="meta/llama-3.1-70b-instruct",
+        model="meta/llama-3.1-8b-instruct",
         openai_api_key=nvidia_key,
         openai_api_base="https://integrate.api.nvidia.com/v1",
         temperature=0,
