@@ -2,9 +2,9 @@
 agent.py — FMCG Beverages SQL Agent
 Uses LangChain + NVIDIA NIM (Llama 3.1 70B) + Supabase PostgreSQL
 
-Memory: ConversationBufferMemory is passed directly into the agent via
-`agent_kwargs`. LangChain injects chat_history into the prompt automatically
-on every call — no manual string building needed.
+Memory: implemented as a simple in-process message list — no external
+dependency required. History is injected into the system prompt on
+every call so follow-up questions resolve context correctly.
 """
 
 import os
@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
 from langchain_openai import ChatOpenAI
-from langchain_classic.memory import ConversationBufferMemory
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -31,17 +30,14 @@ llm = ChatOpenAI(
     temperature=0,
 )
 
-# return_messages=True keeps history as a list of HumanMessage/AIMessage objects.
-# LangChain's agent natively appends to this list — no manual save_context needed.
-memory = ConversationBufferMemory(
-    memory_key="chat_history",
-    return_messages=True,
-)
+# Simple in-process chat history — list of {"role": "user"/"assistant", "content": "..."}
+# No external memory package needed. Cleared by reset_memory().
+_chat_history = []
 
 SYSTEM_PREFIX = """You are an AI assistant for a Consumer Goods (FMCG) company's Beverages category.
 Help business users get insights from sales, inventory, product, and store data.
-if the user question is unrelevent to your knowledge and functions do not run any query just answer that i do not know the answer
-or the question is irrelevent to my knowledge
+If the user question is irrelevant to your data, say so without running any query.
+
 Tables:
 - sales: weekly sales per product per store. promotion_flag=1 = promo active.
 - inventory: stock levels per product per store per week.
@@ -59,11 +55,6 @@ Rules:
 promotion_type values: Price Cut, BOGO, Display Feature, Bundle
 """
 
-# Passing memory + prefix directly into the agent via agent_kwargs.
-# LangChain automatically:
-#   - injects {chat_history} into the prompt before each call
-#   - appends the new Human + AI turn to memory after each call
-# No manual prompt building or save_context calls needed.
 agent = create_sql_agent(
     llm=llm,
     db=db,
@@ -71,17 +62,26 @@ agent = create_sql_agent(
     agent_type="openai-tools",
     max_iterations=5,
     handle_parsing_errors=True,
-    agent_kwargs={
-        "system_message": SYSTEM_PREFIX,
-        "extra_prompt_messages": [memory.chat_memory.messages],
-        "memory": memory,
-    },
 )
 
 
 def ask(question: str) -> dict:
-    # Just pass the question — memory is fully handled by agent_kwargs
-    result = agent.invoke({"input": question})
+    # Build prompt: system context + conversation history + new question
+    history_text = ""
+    for msg in _chat_history[-6:]:   # last 3 turns (6 messages)
+        role = "User" if msg["role"] == "user" else "Assistant"
+        history_text += f"{role}: {msg['content']}\n"
+
+    if history_text:
+        full_input = (
+            SYSTEM_PREFIX
+            + "\n\nConversation so far:\n" + history_text
+            + "\nUser question: " + question
+        )
+    else:
+        full_input = SYSTEM_PREFIX + "\n\nUser question: " + question
+
+    result = agent.invoke({"input": full_input})
 
     raw = result.get("output", "No answer returned.")
     if isinstance(raw, list):
@@ -92,11 +92,15 @@ def ask(question: str) -> dict:
     else:
         answer = str(raw).strip()
 
+    # Save turn to history
+    _chat_history.append({"role": "user",      "content": question})
+    _chat_history.append({"role": "assistant", "content": answer})
+
     return {"answer": answer, "question": question}
 
 
 def reset_memory():
-    memory.clear()
+    _chat_history.clear()
 
 
 if __name__ == "__main__":
