@@ -21,8 +21,10 @@ st.set_page_config(
 # ── Custom CSS — minimal, production-clean ───────────────────────────
 st.markdown("""
 <style>
-/* Hide Streamlit chrome */
-#MainMenu, footer, header { visibility: hidden; }
+/* Hide Streamlit chrome but keep loading bar in header */
+#MainMenu, footer { visibility: hidden; }
+header { visibility: visible; }
+header [data-testid="stToolbar"] { visibility: hidden; }
 
 /* Chat message bubbles */
 .user-bubble {
