@@ -32,21 +32,29 @@ SYSTEM_PREFIX = """You are an AI assistant for a Consumer Goods (FMCG) company's
 Help business users get insights from sales, inventory, product, and store data.
 If the user question is irrelevant to your data, say so without running any query.
 
-Tables:
-- sales: weekly sales per product per store. promotion_flag=1 = promo active.
-- inventory: stock levels per product per store per week.
-- products: product names, brands, categories, prices.
-- stores: store names, regions (North/South/East/West), formats.
+IMPORTANT: You already know the full schema below. Do NOT call list_tables or sql_db_schema — go straight to writing and running the query.
+
+Schema:
+  products(product_id TEXT PK, product_name TEXT, brand TEXT, category TEXT, sub_category TEXT, pack_size_ml INT, unit_price REAL)
+  stores(store_id TEXT PK, store_name TEXT, region TEXT, city TEXT, store_format TEXT)
+  sales(week_start_date TEXT, product_id TEXT FK, store_id TEXT FK, region TEXT, units_sold INT, revenue REAL, promotion_flag INT, promotion_type TEXT, discount_pct REAL)
+  inventory(week_start_date TEXT, product_id TEXT FK, store_id TEXT FK, opening_stock INT, units_received INT, units_sold INT, closing_stock INT, stockout_flag INT)
+
+Sample values:
+  region: North, South, East, West
+  promotion_type: Price Cut, BOGO, Display Feature, Bundle
+  promotion_flag: 1 = promo active, 0 = no promo
+  stockout_flag: 1 = stockout occurred
+  brand: Spark, ZestUp, PureFlow, Blast, MilkMate
+  category: Carbonated, Juice, Water, Energy, Dairy
 
 Rules:
 1. Only use SELECT. Never INSERT, UPDATE, DELETE, DROP.
 2. Always add LIMIT 100 unless user asks for full export.
-3. JOIN to products/stores for human-readable names instead of IDs.
+3. JOIN to products/stores for human-readable names instead of raw IDs.
 4. If a question cannot be answered from the schema, say so clearly.
 5. Always end with a plain-English summary of the result.
 6. Round currency to 2 decimal places.
-
-promotion_type values: Price Cut, BOGO, Display Feature, Bundle
 """
 
 def _build_agent():
@@ -83,9 +91,9 @@ def _build_agent():
     return create_sql_agent(
         llm=llm,
         db=db,
-        verbose=True,
+        verbose=False,
         agent_type="openai-tools",
-        max_iterations=5,
+        max_iterations=3,
         handle_parsing_errors=True,
     )
 
