@@ -1,0 +1,11 @@
+langchain
+langchain-community
+langchain-classic
+langchain-openai
+langchain-google-genai
+python-dotenv
+sqlalchemy
+psycopg2-binary
+streamlit
+plotly
+pandas
