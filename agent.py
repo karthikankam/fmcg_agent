@@ -11,28 +11,22 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from langchain_community.utilities import SQLDatabase
+from langchain_community.utilities import SQLDatabase  # also used as SQLDatabase(engine, ...)
 from langchain_community.agent_toolkits import create_sql_agent
 from langchain_openai import ChatOpenAI
 
 load_dotenv(Path(__file__).parent / ".env")
 
-db = SQLDatabase.from_uri(
-    os.getenv("SUPABASE_DB_URL"),
-    sample_rows_in_table_info=3,
-    include_tables=["products", "stores", "sales", "inventory"],
-)
+# Try to read from Streamlit secrets if running on Streamlit Cloud
+def _get_secret(key: str) -> str:
+    try:
+        import streamlit as st
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key, "")
 
-llm = ChatOpenAI(
-    model="meta/llama-3.1-70b-instruct",
-    openai_api_key=os.getenv("NVIDIA_API_KEY"),
-    openai_api_base="https://integrate.api.nvidia.com/v1",
-    temperature=0,
-)
-
-# Simple in-process chat history — list of {"role": "user"/"assistant", "content": "..."}
-# No external memory package needed. Cleared by reset_memory().
 _chat_history = []
+_agent = None   # lazy-initialised on first ask()
 
 SYSTEM_PREFIX = """You are an AI assistant for a Consumer Goods (FMCG) company's Beverages category.
 Help business users get insights from sales, inventory, product, and store data.
@@ -55,17 +49,52 @@ Rules:
 promotion_type values: Price Cut, BOGO, Display Feature, Bundle
 """
 
-agent = create_sql_agent(
-    llm=llm,
-    db=db,
-    verbose=True,
-    agent_type="openai-tools",
-    max_iterations=5,
-    handle_parsing_errors=True,
-)
+def _build_agent():
+    nvidia_key = _get_secret("NVIDIA_API_KEY")
+    if not nvidia_key:
+        raise ValueError("NVIDIA_API_KEY is not set. Add it to Streamlit secrets or .env.")
+
+    # Build engine from parts — avoids % and @ in password breaking URI string parsing.
+    from sqlalchemy import create_engine
+    from sqlalchemy.engine import URL as SAUrl
+
+    engine = create_engine(
+        SAUrl.create(
+            drivername="postgresql+psycopg2",
+            username=_get_secret("SUPABASE_USER") or "postgres",
+            password=_get_secret("SUPABASE_PASSWORD"),
+            host=_get_secret("SUPABASE_HOST"),
+            port=int(_get_secret("SUPABASE_PORT") or 5432),
+            database=_get_secret("SUPABASE_DB") or "postgres",
+        )
+    )
+
+    db = SQLDatabase(
+        engine,
+        sample_rows_in_table_info=3,
+        include_tables=["products", "stores", "sales", "inventory"],
+    )
+    llm = ChatOpenAI(
+        model="meta/llama-3.1-70b-instruct",
+        openai_api_key=nvidia_key,
+        openai_api_base="https://integrate.api.nvidia.com/v1",
+        temperature=0,
+    )
+    return create_sql_agent(
+        llm=llm,
+        db=db,
+        verbose=True,
+        agent_type="openai-tools",
+        max_iterations=5,
+        handle_parsing_errors=True,
+    )
 
 
 def ask(question: str) -> dict:
+    global _agent
+    if _agent is None:
+        _agent = _build_agent()
+
     # Build prompt: system context + conversation history + new question
     history_text = ""
     for msg in _chat_history[-6:]:   # last 3 turns (6 messages)
@@ -81,7 +110,7 @@ def ask(question: str) -> dict:
     else:
         full_input = SYSTEM_PREFIX + "\n\nUser question: " + question
 
-    result = agent.invoke({"input": full_input})
+    result = _agent.invoke({"input": full_input})
 
     raw = result.get("output", "No answer returned.")
     if isinstance(raw, list):
