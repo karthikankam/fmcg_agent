@@ -50,16 +50,24 @@ promotion_type values: Price Cut, BOGO, Display Feature, Bundle
 """
 
 def _build_agent():
-    db_url = _get_secret("SUPABASE_DB_URL")
     nvidia_key = _get_secret("NVIDIA_API_KEY")
-
-    if not db_url:
-        raise ValueError("SUPABASE_DB_URL is not set. Add it to Streamlit secrets or .env.")
     if not nvidia_key:
         raise ValueError("NVIDIA_API_KEY is not set. Add it to Streamlit secrets or .env.")
 
+    # Build the SQLAlchemy URL from parts to avoid special-character encoding issues
+    # in the raw URI string (password contains % and @ which confuse URL parsers).
+    from sqlalchemy.engine import URL as SAUrl
+    engine_url = SAUrl.create(
+        drivername="postgresql+psycopg2",
+        username=_get_secret("SUPABASE_USER") or "postgres",
+        password=_get_secret("SUPABASE_PASSWORD"),
+        host=_get_secret("SUPABASE_HOST"),
+        port=int(_get_secret("SUPABASE_PORT") or 5432),
+        database=_get_secret("SUPABASE_DB") or "postgres",
+    )
+
     db = SQLDatabase.from_uri(
-        db_url,
+        engine_url,
         sample_rows_in_table_info=3,
         include_tables=["products", "stores", "sales", "inventory"],
     )
