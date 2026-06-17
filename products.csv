@@ -1,0 +1,16 @@
+product_id,product_name,brand,category,sub_category,pack_size_ml,unit_price
+BEV-001,Spark Cola 500ml,Spark,Carbonated,Cola,500,1.2
+BEV-002,Spark Cola 1L,Spark,Carbonated,Cola,1000,2.1
+BEV-003,Spark Lemon Fizz 500ml,Spark,Carbonated,Sparkling Water,500,1.3
+BEV-004,ZestUp Orange Juice 1L,ZestUp,Juice,Fruit Juice,1000,2.5
+BEV-005,ZestUp Apple Juice 250ml,ZestUp,Juice,Fruit Juice,250,0.99
+BEV-006,PureFlow Still Water 500ml,PureFlow,Water,Still Water,500,0.75
+BEV-007,PureFlow Still Water 1.5L,PureFlow,Water,Still Water,1500,1.4
+BEV-008,BlastEnergy Original 250ml,Blast,Energy,Energy Drink,250,1.8
+BEV-009,BlastEnergy Zero 250ml,Blast,Energy,Energy Drink,250,1.8
+BEV-010,BlastEnergy Citrus 500ml,Blast,Energy,Energy Drink,500,2.2
+BEV-011,MilkMate Full Fat 1L,MilkMate,Dairy,Flavoured Milk,1000,1.6
+BEV-012,MilkMate Choc 500ml,MilkMate,Dairy,Flavoured Milk,500,1.1
+BEV-013,ZestUp Mango Juice 1L,ZestUp,Juice,Fruit Juice,1000,2.6
+BEV-014,Spark Tonic Water 330ml,Spark,Carbonated,Tonic,330,1.0
+BEV-015,PureFlow Sparkling 750ml,PureFlow,Water,Sparkling Water,750,1.5
