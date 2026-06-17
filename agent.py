@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from langchain_community.utilities import SQLDatabase
+from langchain_community.utilities import SQLDatabase  # also used as SQLDatabase(engine, ...)
 from langchain_community.agent_toolkits import create_sql_agent
 from langchain_openai import ChatOpenAI
 
@@ -54,20 +54,23 @@ def _build_agent():
     if not nvidia_key:
         raise ValueError("NVIDIA_API_KEY is not set. Add it to Streamlit secrets or .env.")
 
-    # Build the SQLAlchemy URL from parts to avoid special-character encoding issues
-    # in the raw URI string (password contains % and @ which confuse URL parsers).
+    # Build engine from parts — avoids % and @ in password breaking URI string parsing.
+    from sqlalchemy import create_engine
     from sqlalchemy.engine import URL as SAUrl
-    engine_url = SAUrl.create(
-        drivername="postgresql+psycopg2",
-        username=_get_secret("SUPABASE_USER") or "postgres",
-        password=_get_secret("SUPABASE_PASSWORD"),
-        host=_get_secret("SUPABASE_HOST"),
-        port=int(_get_secret("SUPABASE_PORT") or 5432),
-        database=_get_secret("SUPABASE_DB") or "postgres",
+
+    engine = create_engine(
+        SAUrl.create(
+            drivername="postgresql+psycopg2",
+            username=_get_secret("SUPABASE_USER") or "postgres",
+            password=_get_secret("SUPABASE_PASSWORD"),
+            host=_get_secret("SUPABASE_HOST"),
+            port=int(_get_secret("SUPABASE_PORT") or 5432),
+            database=_get_secret("SUPABASE_DB") or "postgres",
+        )
     )
 
-    db = SQLDatabase.from_uri(
-        engine_url,
+    db = SQLDatabase(
+        engine,
         sample_rows_in_table_info=3,
         include_tables=["products", "stores", "sales", "inventory"],
     )
